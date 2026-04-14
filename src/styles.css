@@ -160,7 +160,9 @@ button {
 }
 
 .control-list,
-.activity-list {
+.activity-list,
+.manifest-list,
+.save-list {
   display: grid;
   gap: 12px;
   margin-top: 18px;
@@ -185,12 +187,17 @@ button {
 }
 
 .action-card span,
-.activity-item p {
+.activity-item p,
+.manifest-item p,
+.save-item p,
+.panel-copy {
   color: rgba(247, 234, 215, 0.76);
   line-height: 1.5;
 }
 
-.activity-item {
+.activity-item,
+.manifest-item,
+.save-item {
   border-radius: 18px;
   padding: 14px 15px;
   background: rgba(255, 255, 255, 0.04);
@@ -198,8 +205,42 @@ button {
 }
 
 .activity-item strong,
-.action-card strong {
+.action-card strong,
+.manifest-item strong,
+.save-item strong {
   font-family: Georgia, "Times New Roman", serif;
+}
+
+.panel-copy {
+  margin: 14px 0 0;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.tag-chip {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--theme-hue);
+}
+
+.save-item,
+.save-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.save-actions {
+  flex-wrap: wrap;
+  justify-content: end;
 }
 
 .theme-holo {
@@ -208,7 +249,10 @@ button {
 
 .theme-holo .hero-copy,
 .theme-holo .action-card span,
-.theme-holo .activity-item p {
+.theme-holo .activity-item p,
+.theme-holo .manifest-item p,
+.theme-holo .save-item p,
+.theme-holo .panel-copy {
   color: rgba(216, 255, 248, 0.8);
 }
 
@@ -242,5 +286,10 @@ button {
 
   .surface-host {
     min-height: 420px;
+  }
+
+  .save-item {
+    flex-direction: column;
+    align-items: start;
   }
 }
