@@ -23,4 +23,11 @@ export const themes: Record<
     panelClass: 'theme-holo',
     hue: '#55e6d8',
   },
+  verdant: {
+    name: 'Verdant Expedition',
+    surfaceGradient:
+      'radial-gradient(circle at top, rgba(118, 198, 127, 0.16), transparent 31%), linear-gradient(155deg, #102018, #070b08)',
+    panelClass: 'theme-verdant',
+    hue: '#9bd486',
+  },
 };

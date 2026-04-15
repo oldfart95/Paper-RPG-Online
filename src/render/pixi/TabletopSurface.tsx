@@ -1,25 +1,20 @@
 import { useEffect, useRef } from 'react';
 import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../core/state/appStore';
-
-const CARD_LAYOUT = [
-  { title: 'Ashen Rite', x: 0.27, y: 0.37, rotation: -0.12, accent: 0xcda56a },
-  { title: 'Glass Sky', x: 0.51, y: 0.45, rotation: 0.03, accent: 0x63d8cb },
-  { title: 'Last Lantern', x: 0.75, y: 0.36, rotation: 0.14, accent: 0xef7d57 },
-];
-
-const TOKEN_LAYOUT = [
-  { label: 'GM', x: 0.16, y: 0.74, color: 0x9d6eff },
-  { label: 'P1', x: 0.43, y: 0.77, color: 0x5ad0ff },
-  { label: 'P2', x: 0.66, y: 0.78, color: 0x83d483 },
-];
+import { getRulesetManifest } from '../../engine/rulesets/registry';
 
 export function TabletopSurface() {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const deckCount = useAppStore((state) => state.deckCount);
+  const rulesetId = useAppStore((state) => state.rulesetId);
   const theme = useAppStore((state) => state.theme);
   const scenePulse = useAppStore((state) => state.scenePulse);
+  const currentCard = useAppStore((state) => state.currentCard);
+  const discard = useAppStore((state) => state.discard.slice(0, 3));
+  const ritualProgress = useAppStore((state) => state.ritualProgress);
+  const dangerLevel = useAppStore((state) => state.dangerLevel);
+  const boonWard = useAppStore((state) => state.boonWard);
 
   useEffect(() => {
     let disposed = false;
@@ -45,26 +40,111 @@ export function TabletopSurface() {
       app.stage.addChild(stage);
 
       const glow = new Graphics();
-      stage.addChild(glow);
-
       const field = new Graphics();
-      stage.addChild(field);
-
+      const tracks = new Graphics();
       const cards = new Container();
-      stage.addChild(cards);
+      const textLayer = new Container();
+      const zoneLabels = new Container();
 
-      const tokens = new Container();
-      stage.addChild(tokens);
+      stage.addChild(glow, field, tracks, cards, zoneLabels, textLayer);
 
-      const textStyle = new TextStyle({
-        fill: theme === 'holo' ? 0xdffef9 : 0xf9e8cb,
-        fontFamily: 'Georgia',
-        fontSize: 20,
-        fontWeight: '700',
-      });
+      const createText = (
+        fontSize: number,
+        fill: number,
+        weight: '400' | '500' | '600' | '700' = '700',
+      ) =>
+        new TextStyle({
+          fill,
+          fontFamily: 'Georgia',
+          fontSize,
+          fontWeight: weight,
+        });
 
-      const deckText = new Text({ text: '', style: textStyle });
-      stage.addChild(deckText);
+      const deckText = new Text({ text: '', style: createText(20, theme === 'holo' ? 0xdffef9 : 0xf9e8cb) });
+      const statusText = new Text({ text: '', style: createText(16, theme === 'holo' ? 0xaaf9ee : 0xf0d8b0, '500') });
+      textLayer.addChild(deckText, statusText);
+
+      const renderTrackDots = (originX: number, originY: number, count: number, active: number, fill: number) => {
+        for (let index = 0; index < count; index += 1) {
+          tracks.circle(originX + index * 28, originY, 9);
+          tracks.fill({ color: fill, alpha: index < active ? 0.95 : 0.18 });
+        }
+      };
+
+      const renderZones = (width: number, height: number) => {
+        const ruleset = getRulesetManifest(rulesetId);
+        const zoneStyle = createText(12, theme === 'holo' ? 0xaaf9ee : 0xf0d8b0, '600');
+        zoneLabels.removeChildren().forEach((child) => child.destroy());
+
+        ruleset.zones.forEach((zone) => {
+          const x = width * zone.x;
+          const y = height * zone.y;
+          const zoneWidth = width * zone.width;
+          const zoneHeight = height * zone.height;
+
+          tracks.roundRect(x, y, zoneWidth, zoneHeight, 18);
+          tracks.stroke({ color: theme === 'holo' ? 0x50ecd9 : 0xe0b36d, width: 1, alpha: 0.18 });
+
+          const label = new Text({ text: zone.label.toUpperCase(), style: zoneStyle });
+          label.alpha = 0.48;
+          label.position.set(x + 12, y + 10);
+          zoneLabels.addChild(label);
+        });
+      };
+
+      const renderCard = (
+        x: number,
+        y: number,
+        title: string,
+        subtitle: string,
+        feature: string,
+        accent: string,
+        scale: number,
+        rotation: number,
+        alpha: number,
+      ) => {
+        const playingCardRatio = 63 / 88;
+        const baseHeight = Math.min(app.renderer.height * 0.58, app.renderer.width * 0.3 / playingCardRatio);
+        const cardHeight = baseHeight * scale;
+        const cardWidth = cardHeight * playingCardRatio;
+        const card = new Graphics();
+        card.roundRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 10);
+        card.fill({ color: 0xf6ead3, alpha });
+        card.stroke({ color: Number.parseInt(accent.replace('#', '0x'), 16), width: 4, alpha: 0.9 });
+        card.position.set(x, y);
+        card.rotation = rotation;
+
+        const titleText = new Text({
+          text: title,
+          style: createText(18 * scale, 0x25170e),
+        });
+        titleText.anchor.set(0.5, 0);
+        titleText.position.set(0, -cardHeight * 0.36);
+
+        const subtitleText = new Text({
+          text: subtitle.toUpperCase(),
+          style: createText(10 * scale, 0x6f4b24, '600'),
+        });
+        subtitleText.anchor.set(0.5, 0);
+        subtitleText.position.set(0, -cardHeight * 0.22);
+
+        const featureText = new Text({
+          text: feature,
+          style: new TextStyle({
+            fill: 0x362617,
+            fontFamily: 'Trebuchet MS',
+            fontSize: 12 * scale,
+            fontWeight: '600',
+            wordWrap: true,
+            wordWrapWidth: cardWidth * 0.72,
+          }),
+        });
+        featureText.anchor.set(0.5);
+        featureText.position.set(0, 10 * scale);
+
+        card.addChild(titleText, subtitleText, featureText);
+        cards.addChild(card);
+      };
 
       const renderScene = (time: number) => {
         const width = app.renderer.width;
@@ -74,68 +154,57 @@ export function TabletopSurface() {
         const wave = Math.sin(time / 450) * 0.5 + 0.5;
 
         glow.clear();
-        glow.circle(centerX, centerY * 0.82, Math.min(width, height) * (0.3 + scenePulse * 0.05));
+        glow.circle(centerX, centerY * 0.82, Math.min(width, height) * (0.3 + scenePulse * 0.06));
         glow.fill({ color: theme === 'holo' ? 0x29e9d7 : 0xd49b47, alpha: 0.08 + wave * 0.08 });
 
         field.clear();
-        field.roundRect(width * 0.08, height * 0.1, width * 0.84, height * 0.76, 28);
-        field.fill({ color: theme === 'holo' ? 0x0a1f29 : 0x26180f, alpha: 0.96 });
-        field.stroke({ color: theme === 'holo' ? 0x50ecd9 : 0xe0b36d, width: 2, alpha: 0.7 });
+        field.roundRect(width * 0.05, height * 0.08, width * 0.9, height * 0.82, 34);
+        field.fill({ color: theme === 'holo' ? 0x081c24 : 0x1d120d, alpha: 0.96 });
+        field.stroke({ color: theme === 'holo' ? 0x50ecd9 : 0xe0b36d, width: 2, alpha: 0.8 });
+
+        tracks.clear();
+        renderZones(width, height);
+        renderTrackDots(width * 0.12, height * 0.16, 7, ritualProgress, 0xf0c16b);
+        renderTrackDots(width * 0.12, height * 0.22, 5, dangerLevel, theme === 'holo' ? 0x50ecd9 : 0xf26b5a);
 
         cards.removeChildren();
-        CARD_LAYOUT.forEach((card, index) => {
-          const cardGraphic = new Graphics();
-          const cardWidth = width * 0.16;
-          const cardHeight = height * 0.34;
-          const pulse = 1 + Math.sin(time / 600 + index) * 0.015;
-          cardGraphic.roundRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight, 18);
-          cardGraphic.fill({ color: 0xf7ecd8, alpha: 0.94 });
-          cardGraphic.stroke({ color: card.accent, width: 4, alpha: 0.9 });
-          cardGraphic.position.set(width * card.x, height * card.y);
-          cardGraphic.rotation = card.rotation + Math.sin(time / 900 + index) * 0.02;
-          cardGraphic.scale.set(pulse);
 
-          const title = new Text({
-            text: card.title,
-            style: new TextStyle({
-              fill: 0x2c2118,
-              fontFamily: 'Georgia',
-              fontSize: 16,
-              fontWeight: '700',
-            }),
-          });
-          title.anchor.set(0.5);
-          title.position.set(0, 0);
+        if (currentCard) {
+          renderCard(
+            width * 0.5,
+            height * 0.52 + Math.sin(time / 900) * 5,
+            currentCard.title,
+            currentCard.subtitle,
+            currentCard.feature,
+            currentCard.accent,
+            1,
+            Math.sin(time / 1400) * 0.02,
+            0.96,
+          );
+        }
 
-          cardGraphic.addChild(title);
-          cards.addChild(cardGraphic);
+        discard.forEach((card, index) => {
+          renderCard(
+            width * (0.18 + index * 0.09),
+            height * (0.72 - index * 0.018),
+            card.title,
+            card.subtitle,
+            card.feature,
+            card.accent,
+            0.46,
+            -0.16 + index * 0.08,
+            0.72 - index * 0.12,
+          );
         });
 
-        tokens.removeChildren();
-        TOKEN_LAYOUT.forEach((token, index) => {
-          const chip = new Graphics();
-          const radius = Math.min(width, height) * 0.042;
-          chip.circle(0, 0, radius);
-          chip.fill({ color: token.color, alpha: 0.9 });
-          chip.stroke({ color: 0xffffff, width: 3, alpha: 0.6 });
-          chip.position.set(width * token.x, height * token.y + Math.sin(time / 500 + index) * 4);
+        const ruleset = getRulesetManifest(rulesetId);
+        deckText.text = `${ruleset.terminology.deck} ${deckCount} / ${ruleset.terminology.progress} ${ritualProgress} / ${ruleset.terminology.danger} ${dangerLevel}`;
+        deckText.position.set(width * 0.11, height * 0.1);
 
-          const label = new Text({
-            text: token.label,
-            style: new TextStyle({
-              fill: 0x041016,
-              fontFamily: 'Arial',
-              fontSize: 15,
-              fontWeight: '700',
-            }),
-          });
-          label.anchor.set(0.5);
-          chip.addChild(label);
-          tokens.addChild(chip);
-        });
-
-        deckText.text = `Omen Deck: ${deckCount}`;
-        deckText.position.set(width * 0.12, height * 0.14);
+        statusText.text = boonWard
+          ? `${ruleset.terminology.ward} active: next hazard is ignored.`
+          : `${ruleset.terminology.ward} inactive: hazards resolve normally.`;
+        statusText.position.set(width * 0.11, height * 0.255);
       };
 
       app.ticker.add(() => renderScene(performance.now()));
@@ -148,7 +217,7 @@ export function TabletopSurface() {
       appRef.current?.destroy(true, true);
       appRef.current = null;
     };
-  }, [deckCount, scenePulse, theme]);
+  }, [boonWard, currentCard, dangerLevel, deckCount, discard, ritualProgress, rulesetId, scenePulse, theme]);
 
   return <div className="surface-host" ref={hostRef} />;
 }

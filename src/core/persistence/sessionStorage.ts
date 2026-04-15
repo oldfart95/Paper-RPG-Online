@@ -11,7 +11,11 @@ const defaultSlots = (): SaveSlot[] => [
 
 export const loadThemePreference = (): ThemeId => {
   const saved = window.localStorage.getItem(THEME_KEY);
-  return saved === 'holo' ? 'holo' : 'parchment';
+  if (saved === 'holo' || saved === 'verdant') {
+    return saved;
+  }
+
+  return 'parchment';
 };
 
 export const saveThemePreference = (theme: ThemeId) => {
